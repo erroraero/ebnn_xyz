@@ -2,6 +2,8 @@ import GuestbookClient from "./GuestbookClient";
 import { getGuestbookNotes } from "@/app/actions/guestbook";
 import { Metadata } from "next";
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
     title: "Guestbook | EBNN_CORE",
     description: "Leave a trace in the digital archive.",

@@ -4,6 +4,8 @@ import { createClient } from "@/utils/supabase/server";
 import { Metadata } from "next";
 import { CORE_IDENTITY_ID } from "@/lib/constants";
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
     title: "Configuration Synchronized | Admin",
     description: "System Command Center",

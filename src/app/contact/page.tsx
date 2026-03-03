@@ -2,6 +2,8 @@ import ContactClient from "./ContactClient";
 import { createClient } from "@/utils/supabase/server";
 import { Metadata } from "next";
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
     title: "Contact Core | EBNN_CORE",
     description: "Contact the sovereign architect.",

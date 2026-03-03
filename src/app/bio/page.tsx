@@ -3,6 +3,8 @@ import { BioClient } from "./BioClient";
 import { Metadata } from "next";
 import { CORE_IDENTITY_ID } from "@/lib/constants";
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
     title: "Broadcasting Configuration | Sovereign Profile",
     description: "Digital presence established.",
