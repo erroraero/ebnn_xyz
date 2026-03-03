@@ -292,7 +292,6 @@ export default function BioAdminClient({ initialProfile, initialLinks, initialGa
             setGuestbookNotes([]);
             showToast("Digital Archive Purged");
         }
-        revalidatePath("/bio/admin");
         setLoading(false);
     };
 
