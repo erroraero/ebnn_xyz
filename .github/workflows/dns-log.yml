@@ -1,0 +1,58 @@
+name: EBN DNS Daily Log
+
+on:
+  schedule:
+    - cron: "0 0 * * *"   # every 24 hours (UTC)
+  workflow_dispatch:
+
+jobs:
+  dns-log:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install DNS tools
+        run: sudo apt-get update && sudo apt-get install -y dnsutils
+
+      - name: Fetch DNS Records
+        id: dns
+        run: |
+          DOMAIN="ebnn.xyz"
+
+          A=$(dig +short A $DOMAIN | tr '\n' ' ')
+          AAAA=$(dig +short AAAA $DOMAIN | tr '\n' ' ')
+          MX=$(dig +short MX $DOMAIN | tr '\n' ' ')
+          NS=$(dig +short NS $DOMAIN | tr '\n' ' ')
+          TXT=$(dig +short TXT $DOMAIN | tr '\n' ' ')
+
+          echo "A=$A" >> $GITHUB_OUTPUT
+          echo "AAAA=$AAAA" >> $GITHUB_OUTPUT
+          echo "MX=$MX" >> $GITHUB_OUTPUT
+          echo "NS=$NS" >> $GITHUB_OUTPUT
+          echo "TXT=$TXT" >> $GITHUB_OUTPUT
+
+      - name: Send Discord DNS Log
+        run: |
+          IST_TIME=$(TZ="Asia/Kolkata" date +"%Y-%m-%d %I:%M:%S %p IST")
+
+          curl -H "Content-Type: application/json" \
+          -X POST \
+          -d "{
+            \"embeds\": [{
+              \"title\": \"📊 Daily DNS Snapshot\",
+              \"description\": \"Automated 24h DNS record log for ebnn.xyz\",
+              \"color\": 5814783,
+              \"fields\": [
+                {\"name\": \"🌐 Domain\", \"value\": \"ebnn.xyz\", \"inline\": true},
+                {\"name\": \"⏱️ Time (IST)\", \"value\": \"${IST_TIME}\", \"inline\": true},
+
+                {\"name\": \"📡 A Record\", \"value\": \"${{ steps.dns.outputs.A }}\", \"inline\": false},
+                {\"name\": \"🌍 AAAA Record\", \"value\": \"${{ steps.dns.outputs.AAAA || 'N/A' }}\", \"inline\": false},
+                {\"name\": \"📬 MX Record\", \"value\": \"${{ steps.dns.outputs.MX }}\", \"inline\": false},
+                {\"name\": \"🧭 NS Record\", \"value\": \"${{ steps.dns.outputs.NS }}\", \"inline\": false},
+                {\"name\": \"🧾 TXT Record\", \"value\": \"${{ steps.dns.outputs.TXT }}\", \"inline\": false}
+              ],
+              \"footer\": {
+                \"text\": \"avrxt.git DNS Logging System • 24h Interval\"
+              }
+            }]
+          }" ${{ secrets.MONITOR_DC_HOOK }}
