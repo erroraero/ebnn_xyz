@@ -1,0 +1,42 @@
+- name: Prepare DNS JSON safely
+  run: |
+    IST_TIME=$(TZ="Asia/Kolkata" date +"%Y-%m-%d %I:%M:%S %p IST")
+
+    cat <<EOF > payload.json
+    {
+      "domain": "ebnn.xyz",
+      "time": "$IST_TIME",
+      "A": "${{ steps.dns.outputs.A }}",
+      "AAAA": "${{ steps.dns.outputs.AAAA }}",
+      "MX": "${{ steps.dns.outputs.MX }}",
+      "NS": "${{ steps.dns.outputs.NS }}",
+      "TXT": "${{ steps.dns.outputs.TXT }}"
+    }
+    EOF
+
+- name: Send Discord DNS Log (SAFE)
+  run: |
+    jq '{
+      embeds: [
+        {
+          title: "📊 Daily DNS Snapshot",
+          description: "Automated 24h DNS record log for ebnn.xyz",
+          color: 5814783,
+          fields: [
+            {name: "🌐 Domain", value: .domain, inline: true},
+            {name: "⏱️ Time (IST)", value: .time, inline: true},
+
+            {name: "📡 A Record", value: .A, inline: false},
+            {name: "🌍 AAAA Record", value: (if .AAAA == "" then "N/A" else .AAAA end), inline: false},
+            {name: "📬 MX Record", value: .MX, inline: false},
+            {name: "🧭 NS Record", value: .NS, inline: false},
+            {name: "🧾 TXT Record", value: .TXT, inline: false}
+          ],
+          footer: {
+            text: "avrxt.git DNS Logging System • 24h Interval"
+          }
+        }
+      ]
+    }' payload.json | curl -H "Content-Type: application/json" \
+                        -X POST \
+                        -d @- ${{ secrets.MONITOR_DC_HOOK }}
