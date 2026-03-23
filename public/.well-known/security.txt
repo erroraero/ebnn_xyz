@@ -1,0 +1,25 @@
+Contact: mailto:ebn@wewithu.org
+Expires: 2027-12-31T23:59:59Z
+Preferred-Languages: en, ml
+Canonical: https://www.ebnn.xyz/.well-known/security.txt
+Policy: https://www.ebnn.xyz/security-policy
+
+# --- EBN Security Disclosure ---
+# We take security seriously. If you discover any vulnerabilities,
+# please report them responsibly using the contact above.
+
+# Scope:
+# - www.ebnn.xyz
+# - ebnn.xyz
+# - *.ebnn.xyz
+
+# Guidelines:
+# - Do NOT exploit vulnerabilities beyond proof-of-concept
+# - Do NOT access or modify user data
+# - Do NOT perform DDoS or spam attacks
+# - Give us reasonable time to fix issues before disclosure
+
+# Acknowledgement:
+# Valid reports may be acknowledged publicly (no guarantee of bounty)
+
+# Powered by avrxt infra
