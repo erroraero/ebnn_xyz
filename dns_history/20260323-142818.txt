@@ -1,0 +1,14 @@
+A:
+216.198.79.1
+AAAA:
+MX:
+11 route1.mx.cloudflare.net.
+47 route2.mx.cloudflare.net.
+80 route3.mx.cloudflare.net.
+NS:
+mallory.ns.cloudflare.com.
+gabriel.ns.cloudflare.com.
+TXT:
+"18f74e63143be1b5da29452d4445b4df"
+"google-site-verification=gXUFi11eyxxWZNus-mYLqDWonRUbUJXEtpCCX9-Uh0c"
+"v=spf1 include:_spf.mx.cloudflare.net ~all"
