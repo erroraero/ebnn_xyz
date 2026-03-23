@@ -1,0 +1,70 @@
+name: EBN DNS Daily Log
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+jobs:
+  dns-log:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dnsutils jq
+
+      - name: Fetch DNS Records
+        id: dns
+        run: |
+          DOMAIN="ebnn.xyz"
+
+          A=$(dig +short A $DOMAIN | tr '\n' ' ')
+          AAAA=$(dig +short AAAA $DOMAIN | tr '\n' ' ')
+          MX=$(dig +short MX $DOMAIN | tr '\n' ' ')
+          NS=$(dig +short NS $DOMAIN | tr '\n' ' ')
+          TXT=$(dig +short TXT $DOMAIN | tr '\n' ' ')
+
+          echo "A=$A" >> $GITHUB_OUTPUT
+          echo "AAAA=$AAAA" >> $GITHUB_OUTPUT
+          echo "MX=$MX" >> $GITHUB_OUTPUT
+          echo "NS=$NS" >> $GITHUB_OUTPUT
+          echo "TXT=$TXT" >> $GITHUB_OUTPUT
+
+      - name: Send Discord DNS Log (JQ Safe)
+        run: |
+          IST_TIME=$(TZ="Asia/Kolkata" date +"%Y-%m-%d %I:%M:%S %p IST")
+
+          jq -n \
+            --arg domain "ebnn.xyz" \
+            --arg time "$IST_TIME" \
+            --arg a "${{ steps.dns.outputs.A }}" \
+            --arg aaaa "${{ steps.dns.outputs.AAAA }}" \
+            --arg mx "${{ steps.dns.outputs.MX }}" \
+            --arg ns "${{ steps.dns.outputs.NS }}" \
+            --arg txt "${{ steps.dns.outputs.TXT }}" \
+            '{
+              embeds: [
+                {
+                  title: "📊 Daily DNS Snapshot",
+                  description: "Automated 24h DNS record log for ebnn.xyz",
+                  color: 5814783,
+                  fields: [
+                    {name: "🌐 Domain", value: $domain, inline: true},
+                    {name: "⏱️ Time (IST)", value: $time, inline: true},
+
+                    {name: "📡 A Record", value: $a, inline: false},
+                    {name: "🌍 AAAA Record", value: ($aaaa | select(. != "") // "N/A"), inline: false},
+                    {name: "📬 MX Record", value: $mx, inline: false},
+                    {name: "🧭 NS Record", value: $ns, inline: false},
+                    {name: "🧾 TXT Record", value: $txt, inline: false}
+                  ],
+                  footer: {
+                    text: "avrxt.git DNS Logging System • 24h Interval"
+                  }
+                }
+              ]
+            }' | curl -H "Content-Type: application/json" \
+                     -X POST \
+                     -d @- ${{ secrets.MONITOR_DC_HOOK }}
