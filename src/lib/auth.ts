@@ -5,6 +5,7 @@ import * as schema from "./db/schema";
 import { nextCookies } from "better-auth/next-js";
 
 export const auth = betterAuth({
+    baseURL: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
     database: drizzleAdapter(db, {
         provider: "pg",
         schema: {
