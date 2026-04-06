@@ -4,6 +4,8 @@ import { createAdminClient } from "@/utils/supabase/server";
 import { headers } from "next/headers";
 import { LRUCache } from "lru-cache";
 import { verifyAdmin } from "@/lib/auth-checks";
+import { auth } from "@/lib/auth";
+import { revalidatePath } from "next/cache";
 
 // Guestbook Rate Limiter
 const guestbookLimit = new LRUCache<string, number>({
@@ -11,8 +13,15 @@ const guestbookLimit = new LRUCache<string, number>({
     ttl: 1000 * 60 * 60, // 1 hour per IP
 });
 
-export async function addGuestbookNote(name: string, note: string) {
+export async function addGuestbookNote(note: string) {
     const headerList = await headers();
+    const session = await auth.api.getSession({ headers: headerList });
+
+    if (!session) {
+        return { success: false, error: "AUTH_REQUIRED" };
+    }
+
+    const { user } = session;
     const ip = headerList.get("x-forwarded-for") || "anonymous";
     const supabase = await createAdminClient();
 
@@ -30,9 +39,6 @@ export async function addGuestbookNote(name: string, note: string) {
     guestbookLimit.set(ip, attempts + 1);
 
     // 2. Validation
-    if (!name.trim() || name.length > 50) {
-        return { success: false, error: "NAME_REQUIREMENTS_NOT_MET" };
-    }
     if (!note.trim() || note.length > 500) {
         return { success: false, error: "NOTE_REQUIREMENTS_NOT_MET" };
     }
@@ -40,17 +46,80 @@ export async function addGuestbookNote(name: string, note: string) {
     try {
         const { error } = await supabase
             .from("guestbook")
-            .insert({ name: name.trim(), note: note.trim() });
+            .insert({ 
+                name: user.name, 
+                note: note.trim(),
+                userId: user.id,
+                userName: user.name,
+                userImage: user.image
+            });
 
         if (error) {
             console.error("Guestbook DB Error:", error);
             return { success: false, error: "TRANSMISSION_FAILURE" };
         }
 
+        revalidatePath("/guestbook");
         return { success: true };
     } catch (err) {
         return { success: false, error: "CORE_RUNTIME_ERROR" };
     }
+}
+
+export async function editGuestbookNote(id: string, note: string) {
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session) return { success: false, error: "AUTH_REQUIRED" };
+
+    const supabase = await createAdminClient();
+    
+    // Check ownership
+    const { data: existing } = await supabase.from("guestbook").select("userId").eq("id", id).single();
+    if (!existing || existing.userId !== session.user.id) {
+        return { success: false, error: "UNAUTHORIZED" };
+    }
+
+    if (!note.trim() || note.length > 500) {
+        return { success: false, error: "NOTE_REQUIREMENTS_NOT_MET" };
+    }
+
+    const { error } = await supabase
+        .from("guestbook")
+        .update({ note: note.trim(), updated_at: new Date().toISOString() })
+        .eq("id", id);
+
+    if (error) {
+        console.error("Edit Note Error:", error);
+        return { success: false, error: "DB_FAILURE" };
+    }
+
+    revalidatePath("/guestbook");
+    return { success: true };
+}
+
+export async function deleteGuestbookUserNote(id: string) {
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session) return { success: false, error: "AUTH_REQUIRED" };
+
+    const supabase = await createAdminClient();
+    
+    // Check ownership
+    const { data: existing } = await supabase.from("guestbook").select("userId").eq("id", id).single();
+    if (!existing || existing.userId !== session.user.id) {
+        return { success: false, error: "UNAUTHORIZED" };
+    }
+
+    const { error } = await supabase
+        .from("guestbook")
+        .delete()
+        .eq("id", id);
+
+    if (error) {
+        console.error("Delete Note Error:", error);
+        return { success: false, error: "DB_FAILURE" };
+    }
+
+    revalidatePath("/guestbook");
+    return { success: true };
 }
 
 export async function getGuestbookNotes() {
@@ -82,6 +151,7 @@ export async function deleteGuestbookNotes(ids: string[]) {
         console.error("Delete Notes Error:", error);
         return { success: false };
     }
+    revalidatePath("/guestbook");
     return { success: true };
 }
 
@@ -99,5 +169,6 @@ export async function deleteAllGuestbookNotes() {
         console.error("Delete All Notes Error:", error);
         return { success: false };
     }
+    revalidatePath("/guestbook");
     return { success: true };
 }

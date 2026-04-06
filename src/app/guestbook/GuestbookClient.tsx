@@ -2,39 +2,43 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageSquare, User, Send, Loader2, ArrowLeft, Clock, Shield, Instagram, Github, Disc, Mail } from "lucide-react";
+import { MessageSquare, User, Send, Loader2, ArrowLeft, Clock, Shield, Instagram, Github, Disc, Mail, LogOut, Edit2, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { addGuestbookNote, getGuestbookNotes } from "@/app/actions/guestbook";
+import { addGuestbookNote, getGuestbookNotes, editGuestbookNote, deleteGuestbookUserNote } from "@/app/actions/guestbook";
+import { signIn, signOut, useSession } from "@/lib/auth-client";
 
 interface Note {
     id: string;
     name: string;
     note: string;
     created_at: string;
+    userId?: string;
+    userImage?: string;
+    userName?: string;
 }
 
 export default function GuestbookClient({ initialNotes, isEnabled }: { initialNotes: Note[], isEnabled: boolean }) {
+    const { data: session, isPending: isSessionLoading } = useSession();
     const [notes, setNotes] = useState<Note[]>(initialNotes);
-    const [name, setName] = useState("");
     const [message, setMessage] = useState("");
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
     const [errorMessage, setErrorMessage] = useState("");
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [editMessage, setEditMessage] = useState("");
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!isEnabled || !name.trim() || !message.trim()) return;
+        if (!isEnabled || !message.trim() || !session) return;
         
         setLoading(true);
         try {
-            const res = await addGuestbookNote(name, message);
+            const res = await addGuestbookNote(message);
             if (res.success) {
                 setStatus('success');
-                setName("");
                 setMessage("");
-                // Refresh list
                 const updated = await getGuestbookNotes();
-                setNotes(updated);
+                setNotes(updated as any);
             } else {
                 setStatus('error');
                 setErrorMessage(res.error || "UNKNOWN_ERROR");
@@ -45,6 +49,37 @@ export default function GuestbookClient({ initialNotes, isEnabled }: { initialNo
         }
         setLoading(false);
         setTimeout(() => setStatus('idle'), 3000);
+    };
+
+    const handleEdit = async (id: string) => {
+        if (!editMessage.trim()) return;
+        setLoading(true);
+        try {
+            const res = await editGuestbookNote(id, editMessage);
+            if (res.success) {
+                setEditingId(null);
+                const updated = await getGuestbookNotes();
+                setNotes(updated as any);
+            }
+        } catch (err) {
+            console.error(err);
+        }
+        setLoading(false);
+    };
+
+    const handleDelete = async (id: string) => {
+        if (!confirm("Are you sure you want to delete this trace?")) return;
+        setLoading(true);
+        try {
+            const res = await deleteGuestbookUserNote(id);
+            if (res.success) {
+                const updated = await getGuestbookNotes();
+                setNotes(updated as any);
+            }
+        } catch (err) {
+            console.error(err);
+        }
+        setLoading(false);
     };
 
     return (
@@ -62,9 +97,25 @@ export default function GuestbookClient({ initialNotes, isEnabled }: { initialNo
                     </div>
                     <span className="text-[10px] uppercase font-black tracking-widest">System / Back</span>
                 </Link>
-                <div className="flex items-center gap-2 px-4 py-2 glass rounded-full border-white/5 text-[9px] font-black uppercase tracking-widest text-white/40">
-                    <Shield className="w-3 h-3" /> Digital Archive v1.0
-                </div>
+                
+                {session ? (
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2 px-3 py-1.5 glass rounded-full border-white/5 text-[9px] font-black uppercase tracking-widest text-white/60">
+                            <img src={session.user.image || ""} alt="" className="w-4 h-4 rounded-full border border-white/10" />
+                            {session.user.name}
+                        </div>
+                        <button 
+                            onClick={() => signOut()}
+                            className="p-2 glass rounded-xl hover:bg-red-500/10 hover:text-red-500 transition-all text-white/40"
+                        >
+                            <LogOut className="w-4 h-4" />
+                        </button>
+                    </div>
+                ) : (
+                    <div className="flex items-center gap-2 px-4 py-2 glass rounded-full border-white/5 text-[9px] font-black uppercase tracking-widest text-white/40">
+                        <Shield className="w-3 h-3" /> Digital Archive v1.0
+                    </div>
+                )}
             </motion.div>
 
             <div className="max-w-2xl w-full space-y-12">
@@ -105,43 +156,42 @@ export default function GuestbookClient({ initialNotes, isEnabled }: { initialNo
                                 <p className="text-[10px] text-white/20 font-black uppercase tracking-[0.2em]">The archivist has sealed this frequency. Traces cannot be left at this time.</p>
                             </div>
                         </div>
+                    ) : !session ? (
+                        <div className="py-8 text-center space-y-6">
+                            <div className="space-y-2">
+                                <h3 className="text-xl font-black font-outfit uppercase tracking-tighter">Identity Required</h3>
+                                <p className="text-[10px] text-white/40 font-black uppercase tracking-[0.2em]">Authenticate to leave your frequency trace.</p>
+                            </div>
+                            <button 
+                                onClick={() => signIn.social({ provider: 'github' })}
+                                className="inline-flex items-center gap-3 px-8 py-4 bg-white text-black rounded-2xl font-black uppercase text-[11px] hover:scale-105 transition-all shadow-xl shadow-white/5"
+                            >
+                                <Github className="w-4 h-4" />
+                                Login with Github
+                            </button>
+                        </div>
                     ) : (
                         <>
                         <form onSubmit={handleSubmit} className="space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                                <div className="md:col-span-1 space-y-2">
-                                    <label className="text-[9px] font-black uppercase tracking-widest text-white/30 ml-2">Identify</label>
-                                    <div className="relative group">
-                                        <User className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/20" />
+                            <div className="space-y-2">
+                                <label className="text-[9px] font-black uppercase tracking-widest text-white/30 ml-2">Transmission</label>
+                                <div className="relative group flex flex-col md:flex-row gap-3">
+                                    <div className="relative flex-1">
+                                        <MessageSquare className="absolute left-4 top-5 w-3.5 h-3.5 text-white/20" />
                                         <input 
                                             required
-                                            placeholder="ALIAS"
+                                            placeholder="LEAVE A PROTOCOL NOTE..."
                                             className="w-full bg-white/5 px-10 py-4 rounded-2xl border border-white/5 outline-none focus:border-white/20 transition-all font-outfit font-bold uppercase placeholder:text-white/10 text-[11px]"
-                                            value={name}
-                                            onChange={(e) => setName(e.target.value)}
+                                            value={message}
+                                            onChange={(e) => setMessage(e.target.value)}
                                         />
                                     </div>
-                                </div>
-                                <div className="md:col-span-3 space-y-2">
-                                    <label className="text-[9px] font-black uppercase tracking-widest text-white/30 ml-2">Transmission</label>
-                                    <div className="relative group flex gap-3">
-                                        <div className="relative flex-1">
-                                            <MessageSquare className="absolute left-4 top-5 w-3.5 h-3.5 text-white/20" />
-                                            <input 
-                                                required
-                                                placeholder="LEAVE A PROTOCOL NOTE..."
-                                                className="w-full bg-white/5 px-10 py-4 rounded-2xl border border-white/5 outline-none focus:border-white/20 transition-all font-outfit font-bold uppercase placeholder:text-white/10 text-[11px]"
-                                                value={message}
-                                                onChange={(e) => setMessage(e.target.value)}
-                                            />
-                                        </div>
-                                        <button 
-                                            disabled={loading || !name || !message}
-                                            className="px-6 bg-white text-black rounded-2xl font-black uppercase text-[10px] hover:scale-105 transition-all shadow-xl shadow-white/5 disabled:opacity-20 flex items-center justify-center translate-y-0"
-                                        >
-                                            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                                        </button>
-                                    </div>
+                                    <button 
+                                        disabled={loading || !message}
+                                        className="h-14 px-8 bg-white text-black rounded-2xl font-black uppercase text-[10px] hover:scale-105 transition-all shadow-xl shadow-white/5 disabled:opacity-20 flex items-center justify-center"
+                                    >
+                                        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                                    </button>
                                 </div>
                             </div>
                         </form>
@@ -188,26 +238,76 @@ export default function GuestbookClient({ initialNotes, isEnabled }: { initialNo
                                 whileInView={{ opacity: 1, y: 0 }}
                                 viewport={{ once: true }}
                                 transition={{ delay: i * 0.02 }}
-                                className="glass rounded-3xl p-6 border border-white/5 group hover:border-white/10 transition-all"
+                                className="glass rounded-3xl p-6 border border-white/5 group hover:border-white/10 transition-all relative overflow-hidden"
                             >
                                 <div className="flex justify-between items-start mb-3">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 glass rounded-xl flex items-center justify-center border-white/10">
-                                            <User className="w-3 h-3 text-white/20" />
+                                        <div className="w-8 h-8 glass rounded-xl flex items-center justify-center border-white/10 overflow-hidden">
+                                            {note.userImage ? (
+                                                <img src={note.userImage} alt="" className="w-full h-full object-cover opacity-80" />
+                                            ) : (
+                                                <User className="w-3 h-3 text-white/20" />
+                                            )}
                                         </div>
                                         <div>
-                                            <h3 className="text-xs font-black uppercase tracking-widest text-white/80">{note.name}</h3>
+                                            <h3 className="text-xs font-black uppercase tracking-widest text-white/80">{note.userName || note.name}</h3>
                                             <div className="flex items-center gap-1.5 text-[8px] font-bold text-white/20 tracking-widest uppercase">
                                                 <Clock className="w-2.5 h-2.5" />
                                                 {new Date(note.created_at).toLocaleDateString()}
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="text-[8px] font-black tracking-[0.3em] text-white/5 uppercase">Trace #{note.id.split('-')[0]}</div>
+                                    
+                                    {session?.user.id === note.userId && (
+                                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button 
+                                                onClick={() => {
+                                                    setEditingId(note.id);
+                                                    setEditMessage(note.note);
+                                                }}
+                                                className="p-1.5 glass rounded-lg hover:bg-white/5 text-white/40 hover:text-white transition-all"
+                                            >
+                                                <Edit2 className="w-3 h-3" />
+                                            </button>
+                                            <button 
+                                                onClick={() => handleDelete(note.id)}
+                                                className="p-1.5 glass rounded-lg hover:bg-red-500/10 text-white/40 hover:text-red-500 transition-all"
+                                            >
+                                                <Trash2 className="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
-                                <p className="text-[11px] md:text-xs text-white/50 leading-relaxed font-medium pl-11">
-                                    {note.note}
-                                </p>
+                                
+                                {editingId === note.id ? (
+                                    <div className="pl-11 space-y-3">
+                                        <input 
+                                            autoFocus
+                                            className="w-full bg-white/5 px-4 py-2 rounded-xl border border-white/10 outline-none text-[11px] font-medium"
+                                            value={editMessage}
+                                            onChange={(e) => setEditMessage(e.target.value)}
+                                            onKeyDown={(e) => e.key === 'Enter' && handleEdit(note.id)}
+                                        />
+                                        <div className="flex gap-2">
+                                            <button 
+                                                onClick={() => handleEdit(note.id)}
+                                                className="px-3 py-1.5 bg-white text-black rounded-lg font-black uppercase text-[8px]"
+                                            >
+                                                Save
+                                            </button>
+                                            <button 
+                                                onClick={() => setEditingId(null)}
+                                                className="px-3 py-1.5 glass rounded-lg font-black uppercase text-[8px]"
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <p className="text-[11px] md:text-xs text-white/50 leading-relaxed font-medium pl-11">
+                                        {note.note}
+                                    </p>
+                                )}
                             </motion.div>
                         ))}
                     </div>
