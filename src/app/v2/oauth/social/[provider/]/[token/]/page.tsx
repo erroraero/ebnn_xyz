@@ -88,7 +88,7 @@ function LoginContent() {
                 >
                     {/* Multi-Device Icons Decoration */}
                     <div className="absolute top-0 right-0 p-6 flex gap-3 text-white/5">
-                        <Monitor className="w-4 h-4" />
+                        < Monitor className="w-4 h-4" />
                         <Smartphone className="w-4 h-4" />
                         <Globe className="w-4 h-4" />
                     </div>
